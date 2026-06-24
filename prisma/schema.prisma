@@ -1,0 +1,367 @@
+// ─────────────────────────────────────────────
+// Pulse AI — Prisma Schema
+// Updated: rawContent separated, extensible Score model
+// ─────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────
+// AUTH (NextAuth / Auth.js v5)
+// ─────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  role          UserRole  @default(USER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts      Account[]
+  sessions      Session[]
+  preferences   UserPreference?
+  subscription  Subscription?
+  savedItems    SavedItem[]
+  deliveryLogs  DeliveryLog[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+model OtpCode {
+  id        String   @id @default(cuid())
+  phone     String
+  code      String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([phone])
+  @@map("otp_codes")
+}
+
+// ─────────────────────────────────────────────
+// USER PREFERENCES & SUBSCRIPTIONS
+// ─────────────────────────────────────────────
+
+model UserPreference {
+  id               String          @id @default(cuid())
+  userId           String          @unique
+  whatsappNumber   String?
+  whatsappVerified Boolean         @default(false)
+  interests        Category[]      @default([])
+  digestFrequency  DigestFrequency @default(DAILY)
+  timezone         String          @default("Asia/Kolkata")
+  onboardingDone   Boolean         @default(false)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_preferences")
+}
+
+model Subscription {
+  id                  String             @id @default(cuid())
+  userId              String             @unique
+  plan                Plan               @default(FREE)
+  status              SubscriptionStatus @default(ACTIVE)
+  razorpaySubId       String?            @unique
+  razorpayCustomerId  String?
+  razorpayPlanId      String?
+  currentPeriodStart  DateTime?
+  currentPeriodEnd    DateTime?
+  cancelledAt         DateTime?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
+
+// ─────────────────────────────────────────────
+// INTELLIGENCE — Core Entity
+// ─────────────────────────────────────────────
+
+model IntelligenceItem {
+  id              String    @id @default(cuid())
+  title           String
+  sourceUrl       String    @unique
+  sourceName      String
+  sourceId        String?
+  category        Category
+  tags            String[]  @default([])
+  imageUrl        String?
+  publishedAt     DateTime
+  collectedAt     DateTime  @default(now())
+  duplicateOfId   String?
+
+  // ── Raw content (preserved for AI re-analysis) ──
+  rawContent      String?   @db.Text
+  rawContentHash  String?          // For change detection
+
+  // ── AI-generated analysis ──
+  whatHappened     String?   @db.Text
+  whyItMatters    String?   @db.Text
+  opportunity     String?   @db.Text
+
+  // ── Denormalized primary score (for fast queries) ──
+  opportunityScore Int      @default(0)   // 1-10
+  confidenceScore  Float    @default(0)   // 0.0-1.0
+  
+  // ── Future Expansion (Phase 3+) ──
+  founderScore           Float?   @default(0)
+  sourceReliabilityScore Float?   @default(0)
+  industryTags           String[] @default([])
+
+  analysisStatus  AnalysisStatus @default(PENDING)
+  analyzedAt      DateTime?
+
+  // ── Embedding for dedup & semantic search ──
+  embedding       Float[]   @default([])
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  duplicateOf     IntelligenceItem?  @relation("Duplicates", fields: [duplicateOfId], references: [id])
+  duplicates      IntelligenceItem[] @relation("Duplicates")
+  savedBy         SavedItem[]
+  deliveries      DeliveryItem[]
+  scores          Score[]
+
+  // ── Indexes ──
+  @@index([opportunityScore(sort: Desc), publishedAt(sort: Desc)])
+  @@index([category, opportunityScore(sort: Desc), publishedAt(sort: Desc)])
+  @@index([publishedAt(sort: Desc)])
+  @@index([analysisStatus])
+  @@index([category])
+
+  @@map("intelligence_items")
+}
+
+// ─────────────────────────────────────────────
+// EXTENSIBLE SCORING SYSTEM
+// Supports future score types (Founder Relevance, etc.)
+// ─────────────────────────────────────────────
+
+model Score {
+  id                  String    @id @default(cuid())
+  intelligenceItemId  String
+  type                ScoreType
+  value               Int       // 1-10
+  confidence          Float     @default(0) // 0.0-1.0
+  metadata            Json?     // Flexible extra data per score type
+  generatedBy         String    @default("system") // model name or "manual"
+  createdAt           DateTime  @default(now())
+
+  intelligenceItem    IntelligenceItem @relation(fields: [intelligenceItemId], references: [id], onDelete: Cascade)
+
+  @@unique([intelligenceItemId, type])
+  @@index([type, value(sort: Desc)])
+  @@map("scores")
+}
+
+// ─────────────────────────────────────────────
+// SAVED ITEMS (Bookmarks)
+// ─────────────────────────────────────────────
+
+model SavedItem {
+  id                 String   @id @default(cuid())
+  userId             String
+  intelligenceItemId String
+  createdAt          DateTime @default(now())
+
+  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  intelligenceItem   IntelligenceItem @relation(fields: [intelligenceItemId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, intelligenceItemId])
+  @@map("saved_items")
+}
+
+// ─────────────────────────────────────────────
+// NEWS SOURCES (Configurable)
+// ─────────────────────────────────────────────
+
+model Source {
+  id          String       @id @default(cuid())
+  name        String       @unique
+  url         String
+  type        SourceType
+  category    Category
+  enabled     Boolean      @default(true)
+  sourcePriority Int       @default(5) // 1-10 priority score for news sources
+  config      Json?
+  lastFetchAt DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@map("sources")
+}
+
+// ─────────────────────────────────────────────
+// WHATSAPP DELIVERY
+// ─────────────────────────────────────────────
+
+model DeliveryLog {
+  id              String         @id @default(cuid())
+  userId          String
+  whatsappNumber  String
+  digestType      DigestFrequency
+  status          DeliveryStatus @default(QUEUED)
+  messageId       String?
+  errorMessage    String?
+  retryCount      Int            @default(0)
+  scheduledAt     DateTime
+  sentAt          DateTime?
+  deliveredAt     DateTime?
+  createdAt       DateTime       @default(now())
+
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items           DeliveryItem[]
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status])
+  @@map("delivery_logs")
+}
+
+model DeliveryItem {
+  id                 String   @id @default(cuid())
+  deliveryLogId      String
+  intelligenceItemId String
+
+  deliveryLog        DeliveryLog      @relation(fields: [deliveryLogId], references: [id], onDelete: Cascade)
+  intelligenceItem   IntelligenceItem @relation(fields: [intelligenceItemId], references: [id], onDelete: Cascade)
+
+  @@unique([deliveryLogId, intelligenceItemId])
+  @@map("delivery_items")
+}
+
+// ─────────────────────────────────────────────
+// ADMIN CONFIG
+// ─────────────────────────────────────────────
+
+model AdminPrompt {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  prompt      String   @db.Text
+  model       String   @default("gpt-4o")
+  temperature Float    @default(0.3)
+  isActive    Boolean  @default(true)
+  version     Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("admin_prompts")
+}
+
+// ─────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum Category {
+  AI
+  STARTUPS
+  FUNDING
+  DEVELOPER_TOOLS
+}
+
+enum DigestFrequency {
+  DAILY
+  THREE_HOURLY
+  INSTANT
+}
+
+enum Plan {
+  FREE
+  PRO
+  FOUNDER
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+  PAUSED
+}
+
+enum AnalysisStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum SourceType {
+  RSS
+  API
+  SCRAPER
+}
+
+enum DeliveryStatus {
+  QUEUED
+  SENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+enum ScoreType {
+  OPPORTUNITY
+  FOUNDER_RELEVANCE
+  // Future: MARKET_FIT, COMPETITOR_THREAT, etc.
+}
