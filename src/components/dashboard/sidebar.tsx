@@ -10,7 +10,9 @@ import {
   Settings, 
   LogOut, 
   Menu,
-  X
+  X,
+  History,
+  ShieldAlert
 } from "lucide-react";
 import { Logo } from "@/components/shared/logo";
 import { Button } from "@/components/ui/button";
@@ -19,15 +21,25 @@ import { ThemeToggle } from "@/components/shared/theme-toggle";
 const navItems = [
   { name: "Feed", href: "/feed", icon: LayoutDashboard },
   { name: "Saved", href: "/saved", icon: Bookmark },
+  { name: "History", href: "/history", icon: History },
   { name: "Profile", href: "/profile", icon: User },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 
-export function Sidebar() {
+interface SidebarProps {
+  role?: string;
+}
+
+export function Sidebar({ role }: SidebarProps) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const toggleMobile = () => setMobileOpen(!mobileOpen);
+
+  const activeNavItems = [...navItems];
+  if (role === "ADMIN") {
+    activeNavItems.splice(3, 0, { name: "Admin", href: "/admin", icon: ShieldAlert });
+  }
 
   return (
     <>
@@ -61,7 +73,7 @@ export function Sidebar() {
         </div>
 
         <div className="flex-1 overflow-y-auto py-6 px-4 space-y-1">
-          {navItems.map((item) => {
+          {activeNavItems.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
             return (
               <Link

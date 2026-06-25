@@ -25,22 +25,19 @@ async function main() {
   await prisma.savedItem.deleteMany();
   await prisma.intelligenceItem.deleteMany();
   await prisma.user.deleteMany();
-  await prisma.userPreference.deleteMany();
 
   const mockUser = await prisma.user.create({
     data: {
       email: 'test@pulse.ai',
       name: 'Test Founder',
-      preferences: {
-        create: {
-          digestFrequency: 'DAILY',
-          interests: ['AI', 'STARTUPS'],
-          whatsappNumber: '+1234567890'
-        }
-      }
+      deliveryPreferences: ['DAILY'],
+      interests: ['AI', 'STARTUPS'],
+      whatsappNumber: '+1234567890',
+      whatsappVerified: false,
+      onboardingCompleted: false,
     }
   });
-  console.log('✅ Mock User and Preferences created successfully.');
+  console.log('✅ Mock User created successfully.');
 
   let seededCount = 0;
   for (const item of mockIntelligence) {

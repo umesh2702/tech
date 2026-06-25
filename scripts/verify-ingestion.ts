@@ -15,9 +15,7 @@ async function verify() {
     console.log(`  Status: ${item.analysisStatus}`);
     console.log(`  Category: ${item.category}`);
     if (item.analysisStatus === 'COMPLETED') {
-      console.log(`  Insight: ${item.keyInsight?.substring(0, 100)}...`);
-    } else if (item.analysisStatus === 'FAILED') {
-      console.log(`  Error: ${item.error}`);
+      console.log(`  Insight: ${item.whatHappened?.substring(0, 100)}...`);
     }
   }
 

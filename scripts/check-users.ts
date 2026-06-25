@@ -4,13 +4,14 @@ const prisma = new PrismaClient();
 
 async function main() {
   console.log("=== USERS ===");
-  const users = await prisma.user.findMany({
-    include: { preferences: true }
-  });
+  const users = await prisma.user.findMany();
 
   for (const user of users) {
     console.log(`User: ${user.name} (${user.email})`);
-    console.log(`Preferences:`, user.preferences);
+    console.log(`  WhatsApp: ${user.whatsappNumber} (Verified: ${user.whatsappVerified})`);
+    console.log(`  Timezone: ${user.timezone} | Country: ${user.country}`);
+    console.log(`  Interests: ${user.interests.join(", ")}`);
+    console.log(`  Schedules: ${user.deliveryPreferences.join(", ")}`);
   }
 
   console.log("\n=== OTP CODES ===");

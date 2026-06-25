@@ -17,21 +17,29 @@ datasource db {
 // ─────────────────────────────────────────────
 
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String    @unique
-  emailVerified DateTime?
-  image         String?
-  role          UserRole  @default(USER)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                  String            @id @default(cuid())
+  name                String?
+  email               String            @unique
+  emailVerified       DateTime?
+  image               String?
+  role                UserRole          @default(USER)
+  whatsappNumber      String?
+  whatsappVerified    Boolean           @default(false)
+  timezone            String            @default("Asia/Kolkata")
+  country             String?
+  interests           String[]          @default([])
+  deliveryPreferences DigestFrequency[] @default([DAILY])
+  notificationsEnabled Boolean          @default(true)
+  onboardingCompleted Boolean           @default(false)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
 
   accounts      Account[]
   sessions      Session[]
-  preferences   UserPreference?
   subscription  Subscription?
   savedItems    SavedItem[]
   deliveryLogs  DeliveryLog[]
+  feedbacks     Feedback[]
 
   @@map("users")
 }
@@ -85,27 +93,6 @@ model OtpCode {
 
   @@index([phone])
   @@map("otp_codes")
-}
-
-// ─────────────────────────────────────────────
-// USER PREFERENCES & SUBSCRIPTIONS
-// ─────────────────────────────────────────────
-
-model UserPreference {
-  id               String          @id @default(cuid())
-  userId           String          @unique
-  whatsappNumber   String?
-  whatsappVerified Boolean         @default(false)
-  interests        Category[]      @default([])
-  digestFrequency  DigestFrequency @default(DAILY)
-  timezone         String          @default("Asia/Kolkata")
-  onboardingDone   Boolean         @default(false)
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("user_preferences")
 }
 
 model Subscription {
@@ -164,6 +151,8 @@ model IntelligenceItem {
 
   analysisStatus  AnalysisStatus @default(PENDING)
   analyzedAt      DateTime?
+  retryCount      Int            @default(0)
+  errorMessage    String?        @db.Text
 
   // ── Embedding for dedup & semantic search ──
   embedding       Float[]   @default([])
@@ -317,12 +306,18 @@ enum Category {
   STARTUPS
   FUNDING
   DEVELOPER_TOOLS
+  CYBERSECURITY
+  BIG_TECH
+  RESEARCH
+  PRODUCT_LAUNCHES
 }
 
 enum DigestFrequency {
   DAILY
   THREE_HOURLY
   INSTANT
+  MORNING
+  EVENING
 }
 
 enum Plan {
@@ -364,4 +359,36 @@ enum ScoreType {
   OPPORTUNITY
   FOUNDER_RELEVANCE
   // Future: MARKET_FIT, COMPETITOR_THREAT, etc.
+}
+
+model Feedback {
+  id        String   @id @default(cuid())
+  userId    String
+  rating    Int      // 1-5 stars
+  comment   String?  @db.Text
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("feedbacks")
+}
+
+model SystemLog {
+  id        String   @id @default(cuid())
+  component String   // "RSS", "GEMINI", "WHATSAPP", "SCHEDULER", "DATABASE", "QUEUE"
+  level     String   // "INFO", "WARN", "ERROR", "ALERT_SENT"
+  message   String   @db.Text
+  details   String?  @db.Text
+  createdAt DateTime @default(now())
+
+  @@index([component, createdAt])
+  @@map("system_logs")
+}
+
+model SystemSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+
+  @@map("system_settings")
 }

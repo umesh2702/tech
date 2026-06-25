@@ -1,7 +1,7 @@
 import { serve } from "inngest/next";
 import { inngest } from "@/inngest/client";
 import { ingestSources, analyzeArticle } from "@/inngest/functions";
-import { sendScheduledDigests, sendInstantAlert } from "@/inngest/whatsapp";
+import { sendScheduledDigests, sendInstantAlert, sendDelivery, sendDebouncedAlert } from "@/inngest/whatsapp";
 
 // Create an API that serves zero-downtime background jobs
 export const { GET, POST, PUT } = serve({
@@ -11,5 +11,7 @@ export const { GET, POST, PUT } = serve({
     analyzeArticle,
     sendScheduledDigests,
     sendInstantAlert,
+    sendDelivery,
+    sendDebouncedAlert,
   ],
 });

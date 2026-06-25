@@ -1,7 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
 import { execSync } from "child_process";
-import { client } from "inngest";
 
 const MINGIT_URL = "https://github.com/git-for-windows/git/releases/download/v2.44.0.windows.1/MinGit-2.44.0-64-bit.zip";
 const TEMP_ZIP = path.join(process.cwd(), "mingit.zip");

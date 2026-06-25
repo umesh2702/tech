@@ -4,9 +4,22 @@
 
 // ── Enums (mirroring Prisma schema) ──
 
-export type Category = "AI" | "STARTUPS" | "FUNDING" | "DEVELOPER_TOOLS";
+export type Category =
+  | "AI"
+  | "STARTUPS"
+  | "FUNDING"
+  | "DEVELOPER_TOOLS"
+  | "CYBERSECURITY"
+  | "BIG_TECH"
+  | "RESEARCH"
+  | "PRODUCT_LAUNCHES";
 
-export type DigestFrequency = "DAILY" | "THREE_HOURLY" | "INSTANT";
+export type DigestFrequency =
+  | "DAILY"
+  | "THREE_HOURLY"
+  | "INSTANT"
+  | "MORNING"
+  | "EVENING";
 
 export type Plan = "FREE" | "PRO" | "FOUNDER";
 
@@ -79,20 +92,17 @@ export interface User {
   email: string;
   image: string | null;
   role: UserRole;
-  createdAt: string;
-  updatedAt: string;
-  preferences?: UserPreference;
-  subscription?: Subscription;
-}
-
-export interface UserPreference {
-  id: string;
-  userId: string;
   whatsappNumber: string | null;
   whatsappVerified: boolean;
-  interests: Category[];
-  digestFrequency: DigestFrequency;
   timezone: string;
+  country: string | null;
+  interests: string[];
+  deliveryPreferences: DigestFrequency[];
+  notificationsEnabled: boolean;
+  onboardingCompleted: boolean;
+  createdAt: string;
+  updatedAt: string;
+  subscription?: Subscription;
 }
 
 export interface Subscription {

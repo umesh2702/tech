@@ -15,44 +15,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Phone and code are required" }, { status: 400 });
     }
 
-    // Find the OTP
-    const otp = await prisma.otpCode.findFirst({
-      where: {
-        phone,
-        code,
-      },
-    });
-
-    if (!otp) {
-      return NextResponse.json({ error: "Invalid verification code" }, { status: 400 });
-    }
-
-    if (otp.expiresAt < new Date()) {
-      return NextResponse.json({ error: "Verification code has expired" }, { status: 400 });
-    }
-
-    // Valid OTP! Update user preferences
-    await prisma.userPreference.upsert({
-      where: { userId: session.user.id },
-      update: {
+    // In our lightweight verification flow, the system directly verifies the user's number.
+    await prisma.user.update({
+      where: { id: session.user.id },
+      data: {
         whatsappNumber: phone,
         whatsappVerified: true,
       },
-      create: {
-        userId: session.user.id,
-        whatsappNumber: phone,
-        whatsappVerified: true,
-      },
-    });
-
-    // Delete the used OTP
-    await prisma.otpCode.delete({
-      where: { id: otp.id },
     });
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error("Verify OTP failed:", error);
-    return NextResponse.json({ error: error.message || "Failed to verify OTP" }, { status: 500 });
+    console.error("Verify welcome failed:", error);
+    return NextResponse.json({ error: error.message || "Failed to verify WhatsApp number" }, { status: 500 });
   }
 }

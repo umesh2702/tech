@@ -2,6 +2,26 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import * as fs from "fs";
 import * as path from "path";
+import { createHmac, timingSafeEqual } from "crypto";
+
+function verifySignature(bodyText: string, signatureHeader: string | null, appSecret: string): boolean {
+  if (!signatureHeader) return false;
+  const parts = signatureHeader.split("sha256=");
+  if (parts.length !== 2) return false;
+  const signature = parts[1];
+
+  const hmac = createHmac("sha256", appSecret);
+  const digest = hmac.update(bodyText).digest("hex");
+
+  try {
+    const bufferDigest = Buffer.from(digest, "hex");
+    const bufferSig = Buffer.from(signature, "hex");
+    if (bufferDigest.length !== bufferSig.length) return false;
+    return timingSafeEqual(bufferDigest, bufferSig);
+  } catch (e) {
+    return digest === signature;
+  }
+}
 
 // Webhook Verification (Meta uses GET)
 export async function GET(req: Request) {
@@ -23,7 +43,22 @@ export async function GET(req: Request) {
 // Receive Status Updates and Messages (Meta uses POST)
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    const rawBody = await req.text();
+    const signature = req.headers.get("x-hub-signature-256");
+    const appSecret = process.env.WHATSAPP_APP_SECRET;
+
+    if (appSecret) {
+      const isValid = verifySignature(rawBody, signature, appSecret);
+      if (!isValid) {
+        console.error("[WhatsApp Webhook] Invalid signature received on webhook POST!");
+        return NextResponse.json({ error: "Unauthorized: Invalid webhook signature" }, { status: 401 });
+      }
+    } else {
+      // In development or if app secret is not configured, print warning log but allow bypass
+      console.warn("[WhatsApp Webhook WARNING] WHATSAPP_APP_SECRET is not configured. Webhook payload signature verification bypassed.");
+    }
+
+    const body = JSON.parse(rawBody);
 
     // Log the entire webhook payload for debugging
     console.log("\n====== WHATSAPP WEBHOOK PAYLOAD ======");

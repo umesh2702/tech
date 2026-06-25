@@ -1,0 +1,93 @@
+name: Pulse AI CI Pipeline
+
+on:
+  push:
+    branches: [ main, master, staging ]
+  pull_request:
+    branches: [ main, master, staging ]
+
+jobs:
+  secret-scan:
+    name: Secret Detection & Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run GitLeaks Scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true # Allow beta warning logs to report without hard crashing dev workflows
+
+  build-and-test:
+    name: Lint, Test, and Build Check
+    runs-on: ubuntu-latest
+    needs: secret-scan
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgrespassword
+          POSTGRES_DB: pulse_ai_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/pulse_ai_test?schema=public
+      NEXTAUTH_SECRET: static_nextauth_test_secret_for_ci_build_validation_key
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      WHATSAPP_PHONE_NUMBER_ID: 123456789
+      WHATSAPP_ACCESS_TOKEN: EAABbbccddeeffgghh
+      WHATSAPP_VERIFY_TOKEN: dummy_verify_token_for_ci
+      WHATSAPP_APP_SECRET: dummy_app_secret_for_ci
+      GEMINI_API_KEY: dummy_gemini_key_for_ci
+      NODE_ENV: test
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+          cache-dependency-path: pulse-ai/package-lock.json
+
+      - name: Install Dependencies
+        working-directory: ./pulse-ai
+        run: npm ci
+
+      - name: Validate Prisma Schema Formatting
+        working-directory: ./pulse-ai
+        run: npx prisma validate
+
+      - name: Generate Prisma Client
+        working-directory: ./pulse-ai
+        run: npx prisma generate
+
+      - name: Push Schema to Test PostgreSQL Service
+        working-directory: ./pulse-ai
+        run: npx prisma db push --skip-generate
+
+      - name: Check Database Migration Status
+        working-directory: ./pulse-ai
+        run: npx prisma migrate status
+
+      - name: Code Quality Linting
+        working-directory: ./pulse-ai
+        run: npm run lint
+
+      - name: Next.js Compile Build Verification
+        working-directory: ./pulse-ai
+        run: npm run build

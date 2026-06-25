@@ -1,10 +1,16 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { sendWhatsAppMessage } from "@/lib/whatsapp/client";
-import { formatDigestItem } from "@/lib/whatsapp/digest";
+import { formatDigestItem, calculateWeightedScore } from "@/lib/whatsapp/digest";
 
 export async function POST(req: Request) {
   try {
+    const session = await auth();
+    if (!session?.user?.id || (session.user as any).role !== "ADMIN") {
+      return NextResponse.json({ error: "Unauthorized. Admin access required." }, { status: 401 });
+    }
+
     const { phone } = await req.json();
 
     if (!phone) {
@@ -26,7 +32,13 @@ export async function POST(req: Request) {
     }
 
     const header = `🚨 *Pulse AI Delivery Test*\n\n`;
-    const body = formatDigestItem(item);
+    const scoreData = calculateWeightedScore(item);
+    const rankedItem = {
+      ...item,
+      weightedScore: scoreData.weightedScore,
+      freshnessScore: scoreData.freshnessScore,
+    };
+    const body = formatDigestItem(rankedItem, 1);
 
     // Find the first user to associate the test log with
     const user = await prisma.user.findFirst();

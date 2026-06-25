@@ -35,6 +35,34 @@ export const CATEGORIES: CategoryInfo[] = [
     icon: "Code",
     color: "hsl(199, 89%, 48%)", // Blue
   },
+  {
+    id: "CYBERSECURITY",
+    label: "Cybersecurity",
+    description: "Threat intelligence, data protection, and enterprise security",
+    icon: "Shield",
+    color: "hsl(0, 72%, 51%)", // Red
+  },
+  {
+    id: "BIG_TECH",
+    label: "Big Tech",
+    description: "NVIDIA, Microsoft, Google, Apple, Meta, and Amazon updates",
+    icon: "Building2",
+    color: "hsl(280, 67%, 44%)", // Purple
+  },
+  {
+    id: "RESEARCH",
+    label: "Research",
+    description: "Academic papers, model benchmarks, and open-source models",
+    icon: "GraduationCap",
+    color: "hsl(174, 75%, 39%)", // Teal
+  },
+  {
+    id: "PRODUCT_LAUNCHES",
+    label: "Product Launches",
+    description: "New AI tools, developer software, and SaaS platforms",
+    icon: "Package",
+    color: "hsl(316, 70%, 50%)", // Pink
+  },
 ];
 
 export const CATEGORY_MAP: Record<Category, CategoryInfo> = Object.fromEntries(
@@ -114,8 +142,20 @@ export const DIGEST_FREQUENCIES: {
   {
     id: "DAILY",
     label: "Daily Digest",
-    description: "One curated digest every morning at 8 AM",
+    description: "One curated digest every morning at 9 AM",
     icon: "Sun",
+  },
+  {
+    id: "MORNING",
+    label: "Morning Digest",
+    description: "One curated digest every morning at 8 AM",
+    icon: "SunDim",
+  },
+  {
+    id: "EVENING",
+    label: "Evening Digest",
+    description: "One curated digest every evening at 8 PM",
+    icon: "Moon",
   },
   {
     id: "THREE_HOURLY",

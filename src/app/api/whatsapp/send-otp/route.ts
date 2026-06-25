@@ -16,32 +16,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Phone number is required" }, { status: 400 });
     }
 
-    // Generate 6-digit OTP
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-
-    // Invalidate old OTPs for this phone
-    await prisma.otpCode.deleteMany({
-      where: { phone },
-    });
-
-    // Save new OTP (expires in 10 minutes)
-    await prisma.otpCode.create({
-      data: {
-        phone,
-        code,
-        expiresAt: new Date(Date.now() + 10 * 60 * 1000),
-      },
-    });
-
-    // Send via WhatsApp
+    // Send welcome/test message via WhatsApp
     await sendWhatsAppMessage({
       to: phone,
-      text: `Your Pulse AI verification code is: *${code}*\n\nThis code will expire in 10 minutes.`,
+      text: `🧠 *Welcome to Pulse AI!*\n\nThis is a test message to verify your WhatsApp delivery channel.\n\nPlease return to the onboarding page and confirm receipt to complete verification.`,
     });
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error("Send OTP failed:", error);
-    return NextResponse.json({ error: error.message || "Failed to send OTP" }, { status: 500 });
+    console.error("Send welcome message failed:", error);
+    return NextResponse.json({ error: error.message || "Failed to send welcome message" }, { status: 500 });
   }
 }
