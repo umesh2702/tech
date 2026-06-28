@@ -1,7 +1,6 @@
 import { inngest } from "./client";
 import { prisma } from "@/lib/prisma";
 import { fetchRssFeed } from "@/lib/ingestion/rss";
-import { isDuplicate } from "@/lib/ingestion/dedup";
 import { analyzeContent } from "@/lib/ai/analyzer";
 import { AnalysisStatus, Category } from "@prisma/client";
 import { logger } from "@/lib/logger";
@@ -26,14 +25,32 @@ export const ingestSources = inngest.createFunction(
       return { message: "No active RSS sources found." };
     }
 
+    await logger.info("RSS", `Found ${sources.length} active RSS source(s): ${sources.map(s => s.name).join(", ")}`);
+
+    // FIX: accumulate dispatched counts from step.run return values.
+    // Do NOT mutate a closure variable — Inngest replays step.run callbacks
+    // from its state store, meaning the callback body does not re-execute on
+    // replay and any closure mutations are silently discarded.
     let totalDispatched = 0;
 
     // 2. Iterate over sources and process feeds
     for (const source of sources) {
-      await step.run(`process-source-${source.id}`, async () => {
+      const result = await step.run(`process-source-${source.id}`, async () => {
         try {
           const articles = await fetchRssFeed(source.url);
           let newArticlesCount = 0;
+          let skippedUrlDup = 0;
+          let skippedTitleDup = 0;
+
+          await logger.info("RSS", `Source "${source.name}": fetched ${articles.length} articles from ${source.url}`);
+
+          // Log first 5 article titles/URLs for diagnosis
+          const preview = articles.slice(0, 5).map((a, i) =>
+            `  [${i + 1}] "${a.title.substring(0, 80)}" → ${a.link.substring(0, 100)}`
+          ).join("\n");
+          if (preview) {
+            await logger.info("RSS", `Source "${source.name}" — first ${Math.min(5, articles.length)} articles:\n${preview}`);
+          }
           
           const setting = await prisma.systemSetting.findUnique({
             where: { key: "gemini_batch_size" }
@@ -41,49 +58,74 @@ export const ingestSources = inngest.createFunction(
           const geminiBatchSize = setting ? parseInt(setting.value, 10) : 10;
           
           for (const article of articles) {
-            const duplicate = await isDuplicate(article.link, article.title);
-            
-            if (!duplicate) {
-              if (newArticlesCount >= geminiBatchSize) {
-                await logger.warn("RSS", `Batch limit of ${geminiBatchSize} new articles reached for source: ${source.name}. Skipping remaining articles this run to prevent Gemini throttling.`);
-                break;
-              }
+            // ── URL dedup check ──
+            const urlMatch = await prisma.intelligenceItem.findUnique({
+              where: { sourceUrl: article.link },
+              select: { id: true }
+            });
 
-              // Save raw item as PENDING
-              const newItem = await prisma.intelligenceItem.create({
-                data: {
-                  title: article.title,
-                  sourceUrl: article.link,
-                  sourceName: source.name,
-                  sourceId: source.id,
-                  category: source.category,
-                  rawContent: article.content,
-                  publishedAt: article.publishedAt,
-                  analysisStatus: AnalysisStatus.PENDING,
-                  sourceReliabilityScore: source.sourcePriority || 5,
-                }
-              });
-
-              // Dispatch analysis job
-              await inngest.send({
-                name: "app/analyze.article",
-                data: {
-                  itemId: newItem.id
-                }
-              });
-              
-              newArticlesCount++;
-              totalDispatched++;
+            if (urlMatch) {
+              skippedUrlDup++;
+              await logger.info("RSS", `SKIP (url-dup)  | "${article.title.substring(0, 70)}" | ${article.link.substring(0, 100)}`);
+              continue;
             }
+
+            // ── Title dedup check (last 7 days) ──
+            const sevenDaysAgo = new Date();
+            sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+            const titleMatch = await prisma.intelligenceItem.findFirst({
+              where: { title: article.title, createdAt: { gte: sevenDaysAgo } },
+              select: { id: true }
+            });
+
+            if (titleMatch) {
+              skippedTitleDup++;
+              await logger.info("RSS", `SKIP (title-dup) | "${article.title.substring(0, 70)}" | ${article.link.substring(0, 100)}`);
+              continue;
+            }
+
+            // ── Batch cap ──
+            if (newArticlesCount >= geminiBatchSize) {
+              await logger.warn("RSS", `Batch limit of ${geminiBatchSize} reached for source "${source.name}". Remaining articles deferred to next run.`);
+              break;
+            }
+
+            // ── New article — insert and dispatch ──
+            const newItem = await prisma.intelligenceItem.create({
+              data: {
+                title: article.title,
+                sourceUrl: article.link,
+                sourceName: source.name,
+                sourceId: source.id,
+                category: source.category,
+                rawContent: article.content,
+                publishedAt: article.publishedAt,
+                analysisStatus: AnalysisStatus.PENDING,
+                sourceReliabilityScore: source.sourcePriority || 5,
+              }
+            });
+
+            await inngest.send({
+              name: "app/analyze.article",
+              data: { itemId: newItem.id }
+            });
+
+            await logger.info("RSS", `DISPATCH         | "${article.title.substring(0, 70)}" | itemId: ${newItem.id}`);
+            newArticlesCount++;
           }
-          
+
           // Update last fetch time
           await prisma.source.update({
             where: { id: source.id },
             data: { lastFetchAt: new Date() }
           });
-          
-          await logger.info("RSS", `Successfully processed source: ${source.name}. Found ${newArticlesCount} new articles.`);
+
+          await logger.info(
+            "RSS",
+            `Source "${source.name}" complete — dispatched: ${newArticlesCount}, skipped (url-dup): ${skippedUrlDup}, skipped (title-dup): ${skippedTitleDup}`
+          );
+
+          // Return dispatch count so the outer loop can accumulate correctly
           return { source: source.name, newArticles: newArticlesCount };
 
         } catch (err: any) {
@@ -91,12 +133,16 @@ export const ingestSources = inngest.createFunction(
           throw err; // Let Inngest retry this source step
         }
       });
+
+      // Accumulate from step return value (safe across Inngest replays)
+      totalDispatched += result?.newArticles ?? 0;
     }
 
     await logger.info("RSS", `Ingestion complete. Dispatched ${totalDispatched} articles for AI analysis.`);
     return { message: `Ingestion complete. Dispatched ${totalDispatched} articles for analysis.` };
   }
 );
+
 
 export const analyzeArticle = inngest.createFunction(
   { 
