@@ -35,15 +35,14 @@ export async function sendWhatsAppMessage({ to, text }: WhatsAppMessageOptions) 
     const payload = {
       messaging_product: "whatsapp",
       recipient_type: "individual",
-      to,
+      to: to.replace(/\D/g, ""), // removes +, spaces, -, etc.
       type: "text",
       text: {
-        preview_url: true,
+        preview_url: false,
         body: text,
       },
     };
 
-    console.log("Meta Payload:", JSON.stringify(payload, null, 2));
 
     const response = await fetch(`${getBaseUrl()}/messages`, {
       method: "POST",
@@ -52,7 +51,6 @@ export async function sendWhatsAppMessage({ to, text }: WhatsAppMessageOptions) 
     });
 
     const data = await response.json();
-    console.log("Meta Response:", JSON.stringify(data, null, 2));
 
     if (!response.ok) {
       console.error("WhatsApp API Error:", JSON.stringify(data, null, 2));

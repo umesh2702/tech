@@ -78,13 +78,12 @@ export async function analyzeContent(
       const parsed = JSON.parse(responseText);
       return parsed as IntelligenceAnalysis;
     } catch (error) {
-      console.error("Gemini Error analyzing content:", error);
-      throw error;
+      console.error("Gemini Error analyzing content, falling back to OpenAI/mock:", error);
     }
   }
 
-  // Fallback to OpenAI if GEMINI_API_KEY is not set
-  if (!process.env.OPENAI_API_KEY) {
+  // Fallback to OpenAI if GEMINI_API_KEY is not set or failed
+  if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === "your-openai-api-key") {
     console.warn("API keys missing. Falling back to mock analysis.");
     return generateMockAnalysis(rawContent);
   }

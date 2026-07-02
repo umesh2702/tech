@@ -1,7 +1,7 @@
 import { generateDigest } from "../src/lib/whatsapp/digest";
 import { prisma } from "../src/lib/prisma";
 
-const PHONE = "+918121693113";
+const PHONE = "+918978613139";
 
 async function main() {
   console.log("=== RUNNING DIRECT DIGEST GENERATION TEST ===");

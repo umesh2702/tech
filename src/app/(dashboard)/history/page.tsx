@@ -132,8 +132,8 @@ export default function HistoryPage() {
     }
   };
 
-  // Reconstruct WhatsApp digest formatting for the UI preview
   const getReconstructedText = (log: DeliveryLog) => {
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
     const dateStr = new Date(log.createdAt).toLocaleDateString(undefined, {
       weekday: "long",
       year: "numeric",
@@ -161,7 +161,7 @@ export default function HistoryPage() {
 🗂️ *Category:* ${item.category.replace("_", " ")}
 
 _Dashboard Link:_
-http://localhost:3000/dashboard/item/${item.id}`;
+${appUrl}/dashboard/item/${item.id}`;
       })
       .join("\n\n---\n\n");
 

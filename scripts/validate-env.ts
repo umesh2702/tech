@@ -132,8 +132,8 @@ async function runDiagnostics() {
     } catch (geminiErr: any) {
       diagnostics.push({
         category: "Gemini AI API Engine",
-        status: "ERROR",
-        message: "Failed to authenticate or contact Gemini API.",
+        status: "WARNING",
+        message: "Failed to authenticate or contact Gemini API. Fallback analyzer (OpenAI or mock) will be used.",
         details: geminiErr.message || String(geminiErr)
       });
     }

@@ -1,7 +1,7 @@
 import { prisma } from "../src/lib/prisma";
 import { generateDigest } from "../src/lib/whatsapp/digest";
 
-const PHONE = "+918121693113";
+const PHONE = "+918978613139";
 
 async function main() {
   console.log("=== VERIFYING PERSONALIZATION AND EXTENSIBLE INTEREST FILTER ===");
