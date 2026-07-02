@@ -39,7 +39,7 @@ export async function sendWhatsAppMessage({ to, text }: WhatsAppMessageOptions) 
       type: "text",
       text: {
         preview_url: false,
-        body: text,
+        body: "Hello",
       },
     };
 
