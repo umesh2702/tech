@@ -61,20 +61,17 @@ export async function POST(req: Request) {
     const appSecret = process.env.WHATSAPP_APP_SECRET;
 
     // Verify payload authenticity via HMAC-SHA256
-    if (appSecret) {
-      const isValid = verifySignature(rawBody, signature, appSecret);
-      if (!isValid) {
-        console.error("[WhatsApp Webhook] Invalid HMAC signature — payload rejected.");
-        return NextResponse.json(
-          { error: "Unauthorized: Invalid webhook signature" },
-          { status: 401 }
-        );
-      }
-    } else {
-      // WHATSAPP_APP_SECRET not configured. Set it in Vercel environment variables
-      // to enforce payload authenticity checks on all incoming webhooks.
-      console.warn(
-        "[WhatsApp Webhook] WHATSAPP_APP_SECRET not set — HMAC verification bypassed."
+    if (!appSecret) {
+      console.error("[WhatsApp Webhook] WHATSAPP_APP_SECRET is not configured. Rejecting payload for security.");
+      return NextResponse.json({ error: "Server Configuration Error" }, { status: 500 });
+    }
+
+    const isValid = verifySignature(rawBody, signature, appSecret);
+    if (!isValid) {
+      console.error("[WhatsApp Webhook] Invalid HMAC signature — payload rejected.");
+      return NextResponse.json(
+        { error: "Unauthorized: Invalid webhook signature" },
+        { status: 401 }
       );
     }
 

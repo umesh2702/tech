@@ -1,4 +1,4 @@
-async function test() {
+async function testInngestLocal() {
   console.log("Fetching http://localhost:3000/api/inngest...");
   try {
     const res = await fetch("http://localhost:3000/api/inngest");
@@ -13,4 +13,4 @@ async function test() {
   }
 }
 
-test();
+testInngestLocal();

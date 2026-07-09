@@ -9,7 +9,8 @@
     "start": "next start",
     "lint": "eslint",
     "production-check": "ts-node scripts/validate-env.ts",
-    "load-test": "ts-node scripts/load-test.ts"
+    "load-test": "ts-node scripts/load-test.ts",
+    "test-whatsapp": "ts-node --project tsconfig.scripts.json scripts/test-whatsapp.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.2",
@@ -46,6 +47,8 @@
     "eslint-config-next": "16.2.9",
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
+    "tsx": "^4.23.0",
     "typescript": "^5.9.3"
   }
 }

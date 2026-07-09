@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { sendWhatsAppMessage } from "@/lib/whatsapp/client";
+import { sendWelcome } from "@/lib/whatsapp/sender";
+
+// Tests the Meta API connection using the pulse_welcome template.
+// This is the canonical connection test endpoint.
 
 export async function POST(req: Request) {
   try {
@@ -10,19 +13,29 @@ export async function POST(req: Request) {
     }
 
     const { phone } = await req.json();
-
     if (!phone) {
-      return NextResponse.json({ error: "Phone number is required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Phone number is required" },
+        { status: 400 }
+      );
     }
 
-    await sendWhatsAppMessage({
-      to: phone,
-      text: "👋 Hello from Pulse AI! Your Meta WhatsApp Cloud API connection is successful.",
-    });
+    const messageId = await sendWelcome(
+      session.user.id,
+      phone,
+      session.user.name || "there"
+    );
 
-    return NextResponse.json({ success: true });
-  } catch (error: any) {
+    return NextResponse.json({
+      success: true,
+      messageId,
+      template: "pulse_welcome",
+      message: "WhatsApp API connection is working correctly.",
+    });
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Failed to send message";
     console.error("Test connection failed:", error);
-    return NextResponse.json({ error: error.message || "Failed to send message" }, { status: 500 });
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -39,7 +39,7 @@ async function testEndpoint(endpointName: string, path: string) {
   }
 }
 
-async function run() {
+async function executeTests() {
   // Test Top 5
   await testEndpoint("Top 5 Curated Digest", "/api/test-whatsapp/top5");
 
@@ -49,5 +49,4 @@ async function run() {
   // Test Instant Alert
   await testEndpoint("Instant Alert", "/api/test-whatsapp/instant");
 }
-
-run().catch(console.error);
+executeTests().catch(console.error);

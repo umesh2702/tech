@@ -247,7 +247,10 @@ model DeliveryLog {
   digestType      DigestFrequency
   status          DeliveryStatus @default(QUEUED)
   messageId       String?
-  errorMessage    String?
+  templateName    String?        // Meta-approved template name used for this delivery
+  errorMessage    String?        @db.Text
+  errorCode       Int?           // Meta numeric error code (if failed)
+  rawResponse     Json?          // Full Meta API response blob for debugging
   retryCount      Int            @default(0)
   scheduledAt     DateTime
   sentAt          DateTime?
@@ -259,6 +262,7 @@ model DeliveryLog {
 
   @@index([userId, createdAt(sort: Desc)])
   @@index([status])
+  @@index([templateName])
   @@map("delivery_logs")
 }
 

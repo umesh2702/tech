@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { sendWhatsAppMessage } from "@/lib/whatsapp/client";
-
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "http://localhost:3000";
+import { sendDigest } from "@/lib/whatsapp/sender";
 
 export async function POST() {
   try {
@@ -13,37 +11,47 @@ export async function POST() {
     }
 
     const user = await prisma.user.findUnique({
-      where: { id: session.user.id }
+      where: { id: session.user.id },
     });
 
     if (!user || !user.whatsappNumber || !user.whatsappVerified) {
-      return NextResponse.json({ error: "Please connect and verify a WhatsApp number first." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Please connect and verify a WhatsApp number first." },
+        { status: 400 }
+      );
     }
 
-    // Find the highest scoring completed item
+    // Find the highest-scoring completed item for the test
     const item = await prisma.intelligenceItem.findFirst({
       where: { analysisStatus: "COMPLETED" },
-      orderBy: { opportunityScore: "desc" }
+      orderBy: { opportunityScore: "desc" },
     });
 
     if (!item) {
-      return NextResponse.json({ error: "No completed opportunities found in the database to send a test alert." }, { status: 400 });
+      return NextResponse.json(
+        { error: "No completed opportunities found in the database to send a test alert." },
+        { status: 400 }
+      );
     }
 
-    const text = `🧪 *Pulse AI — Test Alert* (Score: ${item.opportunityScore}/10)\n\n*${item.title}*\n\n⭐ *Opportunity:* ${item.opportunityScore}/10\n🚀 *Founder Fit:* ${item.founderScore || 0}/10\n\n*Why it matters:*\n_${item.whyItMatters || "N/A"}_\n\n*Founder opportunity:*\n${item.opportunity || "N/A"}\n\n_Dashboard:_\n${APP_URL}/dashboard/item/${item.id}`;
-
-    const metaResult = await sendWhatsAppMessage({
-      to: user.whatsappNumber,
-      text: text
-    });
+    // Send via pulse_digest_ready template (instant alert variant)
+    const summary = item.whyItMatters || item.opportunity || "High-opportunity item detected.";
+    const messageId = await sendDigest(
+      user.id,
+      user.whatsappNumber,
+      "Instant Alert",
+      1,
+      summary
+    );
 
     return NextResponse.json({
       success: true,
-      message: "Test alert successfully dispatched!",
-      meta: metaResult
+      message: "Test alert (pulse_digest_ready template) successfully dispatched!",
+      messageId,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Failed to send test alert.";
     console.error("Test alert failed:", error);
-    return NextResponse.json({ error: error.message || "Failed to send test alert." }, { status: 500 });
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
