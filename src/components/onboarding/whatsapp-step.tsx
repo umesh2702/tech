@@ -23,8 +23,6 @@ export function WhatsAppStep({
 }: WhatsAppStepProps) {
   const [testSent, setTestSent] = useState(false);
   const [isSending, setIsSending] = useState(false);
-  const [isVerifying, setIsVerifying] = useState(false);
-
   const handleSendTestMessage = async () => {
     if (whatsappNumber.length < 10) return;
     setIsSending(true);
@@ -33,50 +31,37 @@ export function WhatsAppStep({
         ? whatsappNumber 
         : `+91${whatsappNumber}`; // default to +91 if no code
 
-      const res = await fetch("/api/whatsapp/send-otp", {
+      const res = await fetch("/api/whatsapp/send-welcome", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone: formattedPhone }),
       });
 
+      if (!res.ok) {
+        const text = await res.text();
+        let errorMessage = "Failed to send welcome message";
+        try {
+          const parsed = JSON.parse(text);
+          errorMessage = parsed.error || errorMessage;
+        } catch (e) {
+          console.error("Non-JSON error response:", text);
+        }
+        throw new Error(errorMessage);
+      }
+
       const data = await res.json();
-      if (!res.ok || data.success === false) {
+      if (data.success === false) {
         throw new Error(data.error || "Failed to send welcome message");
       }
 
       setTestSent(true);
-      toast.success("Welcome message sent successfully via WhatsApp!");
+      setWhatsappVerified(true);
+      toast.success("Welcome message sent successfully! WhatsApp Connected.");
     } catch (err: any) {
       console.error(err);
       toast.error(err.message || "Failed to send welcome message. Please verify your Meta credentials.");
     } finally {
       setIsSending(false);
-    }
-  };
-
-  const handleConfirmReceipt = async () => {
-    setIsVerifying(true);
-    try {
-      const formattedPhone = whatsappNumber.startsWith("+") 
-        ? whatsappNumber 
-        : `+91${whatsappNumber}`;
-
-      const res = await fetch("/api/whatsapp/verify-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: formattedPhone, code: "CONFIRM" }), // pass confirm flag
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to verify phone number");
-
-      setWhatsappVerified(true);
-      toast.success("WhatsApp number verified!");
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err.message || "Verification failed");
-    } finally {
-      setIsVerifying(false);
     }
   };
 
@@ -117,7 +102,7 @@ export function WhatsAppStep({
               </div>
             </div>
 
-            {!testSent ? (
+            {!testSent && (
               <Button
                 onClick={handleSendTestMessage}
                 disabled={whatsappNumber.length < 10 || isSending}
@@ -127,37 +112,6 @@ export function WhatsAppStep({
               >
                 {isSending ? "Sending Welcome Message..." : "Send Welcome Test Message"}
               </Button>
-            ) : (
-              <div className="space-y-4 p-4 border rounded-xl bg-card">
-                <div className="flex items-start gap-2.5 text-sm">
-                  <AlertCircle className="h-4 w-4 text-pulse-amber shrink-0 mt-0.5" />
-                  <div className="space-y-1">
-                    <p className="font-medium text-foreground">Welcome message dispatched!</p>
-                    <p className="text-muted-foreground text-xs leading-relaxed">
-                      We sent a test message to your phone. Please check your WhatsApp. If you received it, click the receipt confirmation button below.
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="flex flex-col gap-2">
-                  <Button
-                    onClick={handleConfirmReceipt}
-                    disabled={isVerifying}
-                    className="w-full gradient-primary text-white border-0"
-                    id="confirm-receipt-btn"
-                  >
-                    {isVerifying ? "Verifying..." : "Yes, I received the message"}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => setTestSent(false)}
-                    disabled={isVerifying}
-                    className="w-full"
-                  >
-                    Change Phone Number
-                  </Button>
-                </div>
-              </div>
             )}
           </>
         ) : (

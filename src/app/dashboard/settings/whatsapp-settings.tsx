@@ -31,40 +31,34 @@ export function WhatsAppSettings({ initialPhone, isVerified }: { initialPhone: s
     }
   };
 
-  const handleSendOtp = async () => {
+  const handleSendWelcome = async () => {
     setLoading(true);
     setMessage(null);
     try {
-      const res = await fetch("/api/whatsapp/send-otp", {
+      const res = await fetch("/api/whatsapp/send-welcome", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone }),
       });
+      if (!res.ok) {
+        const text = await res.text();
+        let errorMessage = "Failed to send welcome message";
+        try {
+          const parsed = JSON.parse(text);
+          errorMessage = parsed.error || errorMessage;
+        } catch (e) {
+          console.error("Non-JSON error response:", text);
+        }
+        throw new Error(errorMessage);
+      }
+      
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      setStep("otp");
-      setMessage({ type: "success", text: "Verification code sent!" });
-    } catch (err: any) {
-      setMessage({ type: "error", text: err.message });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVerifyOtp = async () => {
-    setLoading(true);
-    setMessage(null);
-    try {
-      const res = await fetch("/api/whatsapp/verify-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, code: otp }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      setMessage({ type: "success", text: "Phone verified successfully!" });
+      if (data.success === false) {
+        throw new Error(data.error || "Failed to send welcome message");
+      }
+      
+      setMessage({ type: "success", text: "Welcome message sent! Phone verified successfully!" });
       router.refresh();
-      setStep("input");
     } catch (err: any) {
       setMessage({ type: "error", text: err.message });
     } finally {
@@ -109,53 +103,15 @@ export function WhatsAppSettings({ initialPhone, isVerified }: { initialPhone: s
           
           <div className="flex gap-3">
             <button 
-              onClick={handleTestConnection}
-              disabled={loading || !phone}
-              className="px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 disabled:opacity-50"
-            >
-              Test Connection
-            </button>
-            <button 
-              onClick={handleSendOtp}
+              onClick={handleSendWelcome}
               disabled={loading || !phone}
               className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
             >
-              Verify Number
+              Verify Number via Welcome Message
             </button>
           </div>
         </div>
-      ) : (
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-2">Enter Verification Code</label>
-            <input 
-              type="text" 
-              placeholder="6-digit code" 
-              className="w-full bg-background border rounded-md px-3 py-2 text-center text-lg tracking-widest"
-              value={otp}
-              onChange={(e) => setOtp(e.target.value)}
-              maxLength={6}
-            />
-          </div>
-          
-          <div className="flex gap-3">
-            <button 
-              onClick={() => setStep("input")}
-              disabled={loading}
-              className="px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 disabled:opacity-50"
-            >
-              Back
-            </button>
-            <button 
-              onClick={handleVerifyOtp}
-              disabled={loading || otp.length !== 6}
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
-            >
-              Confirm
-            </button>
-          </div>
-        </div>
-      )}
+      ) : null}
 
       {message && (
         <div className={`p-3 rounded-md text-sm border ${message.type === 'error' ? 'bg-red-500/10 text-red-500 border-red-500/20' : 'bg-green-500/10 text-green-500 border-green-500/20'}`}>
